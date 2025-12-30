@@ -9,14 +9,11 @@ import { User, Mail, Key, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import ThemeToggle from "@/components/features/ThemeToggle"
+import ThemeToggle from "@/components/features/theme-toggle"
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3"
-import { useConfig } from "@/hooks/useConfig"
 
 export default function RegisterPage() {
   const router = useRouter()
-  const { isSiteNameLoading, config } = useConfig();
   const { executeRecaptcha } = useGoogleReCaptcha();
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -86,7 +83,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center px-4">
+    <div className="min-h-screen bg-linear-to-br from-background to-muted flex items-center justify-center px-4">
       <div className="relative max-w-4xl w-full rounded-2xl shadow-xl border overflow-hidden grid lg:grid-cols-2 bg-background">
         <div className="absolute top-4 right-4">
           <ThemeToggle />
@@ -112,7 +109,7 @@ export default function RegisterPage() {
 
           {/* Site Name */}
           <h1 className="text-2xl md:text-3xl font-bold text-white">
-            {isSiteNameLoading ? <Skeleton className="h-8 w-32 mx-auto" /> : config?.siteName || "Prabisha"}
+            Prabisha Chatbot Builder
           </h1>
 
           {/* Byline */}

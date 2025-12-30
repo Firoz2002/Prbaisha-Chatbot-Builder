@@ -1,168 +1,544 @@
-"use client";
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { 
-  FileText, 
-  BookOpen, 
-  Palette, 
-  Zap, 
-  Sparkles, 
-  Pen, 
-  CircleFadingPlus,
-  List,
-  Settings,
-} from "lucide-react";
+"use client"
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import {
-  Sidebar as SidebarComponent,
+  AudioWaveform,
+  BookOpen,
+  Bot,
+  Cable,
+  Command,
+  Drill,
+  Frame,
+  GalleryVerticalEnd,
+  Gauge,
+  LayoutDashboard,
+  Map,
+  MessageCircle,
+  Palette,
+  PieChart,
+  ScrollText,
+  Settings2,
+  SlidersHorizontal,
+  SquareTerminal,
+  UsersRound,
+} from "lucide-react"
+import {
+  Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
+  SidebarRail,
+} from "@/components/ui/sidebar"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
+  useSidebar,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  SidebarTrigger,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarMenuAction
 } from "@/components/ui/sidebar";
-import { ScrollArea } from "../ui/scroll-area";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, type LucideIcon } from "lucide-react"
+import {
+  BadgeCheck,
+  Bell,
+  ChevronsUpDown,
+  CreditCard,
+  LogOut,
+  Sparkles,
+  Plus
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuShortcut
+} from "@/components/ui/dropdown-menu"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSession } from "next-auth/react"
+import { Workspace } from "@/types/workspace"
+import { Session } from "next-auth";
+import { toast } from "sonner";
+import { WorkspaceForm } from "../forms/workspace-form";
+import { useWorkspace } from "@/providers/workspace-provider";
 
-// Static menu items
-const MENU_ITEMS = [
-  {
-    title: "Instructions",
-    icon: FileText,
-    url: "/instructions",
-  },
-  {
-    title: "Knowledge",
-    icon: BookOpen,
-    url: "/knowledge",
-  },
-  {
-    title: "Logic",
-    icon: List,
-    url: "/logic",
-  },
-  {
-    title: "Theme",
-    icon: Palette,
-    url: "/theme",
-  },
-  {
-    title: "Integrations",
-    icon: Zap,
-    url: "/integrations",
-  },
-  {
-    title: "AI Model",
-    icon: Sparkles,
-    url: "/ai-model",
-  },
-  {
-    title: "Settings",
-    icon: Settings,
-    url: "/settings",
-  },
-];
+// Types for navigation items
+type NavItem = {
+  title: string
+  url: string
+  icon?: LucideIcon
+  isActive?: boolean
+  items?: {
+    icon?: LucideIcon
+    title: string
+    url: string
+  }[]
+}
 
-export default function Sidebar() {
-    const pathname = usePathname();
+export default function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const id = props.id;
+
+  const defaultNavData = {
+    mainNav: [
+      {
+        title: "Playground",
+        url: "#",
+        icon: SquareTerminal,
+        isActive: true,
+        items: [
+          {
+            icon: Gauge,
+            title: "Dashboard",
+            url: "/dashboard",
+          },
+          {
+            icon: Bot,
+            title: "Chatbots",
+            url: "/chatbots",
+          },
+        ],
+      },
+      {
+        title: "Settings",
+        url: "#",
+        icon: Settings2,
+        items: [
+          {
+            icon: SlidersHorizontal,
+            title: "General",
+            url: "#",
+          },
+          {
+            icon: UsersRound,
+            title: "Team",
+            url: "#",
+          },
+          {
+            icon: CreditCard,
+            title: "Billing",
+            url: "#",
+          },
+          {
+            icon: Frame,
+            title: "Limits",
+            url: "#",
+          },
+        ],
+      },
+    ],
+    chatbotNav: [
+      {
+        title: "Build",
+        url: "#",
+        icon: Drill,
+        isActive: true,
+        items: [
+          {
+            icon: ScrollText,
+            title: "Instructions",
+            url: `/chatbots/${id}/instructions`,
+          },
+          {
+            icon: BookOpen,
+            title: "Knowledge",
+            url: `/chatbots/${id}/knowledge`,
+          },
+          {
+            icon: Map,
+            title: "Logic",
+            url: `/chatbots/${id}/logic`,
+          },
+          {
+            icon: Palette,
+            title: "Theme",
+            url: `/chatbots/${id}/theme`,
+          },
+          {
+            icon: Cable,
+            title: "Integrations",
+            url: `/chatbots/${id}/integrations`,
+          },
+          {
+            icon: Bot,
+            title: "AI Model",
+            url: `/chatbots/${id}/models`,
+          },
+          {
+            icon: Settings2,
+            title: "Settings",
+            url: `/chatbots/${id}/settings`,
+          },
+        ]
+      },
+      {
+        title: "Review",
+        url: "#",
+        icon: SquareTerminal,
+        isActive: true,
+        items: [
+          {
+            icon: MessageCircle,
+            title: "Conversations",
+            url: `/chatbots/${id}/conversations`,
+          },
+          {
+            icon: Settings2,
+            title: "Settings",
+            url: `/chatbots/${id}/settings`,
+          },
+        ]
+      }
+    ],
+  }
+  const { data: session } = useSession();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [navData, setNavData] = useState<NavItem[]>([]);
+
+  useEffect(() => {
+    // Fetch workspaces
+    const fetchWorkspaces = async () => {
+      try {
+        const res = await fetch('/api/workspaces');
+        const data = await res.json();
+        setWorkspaces(data || []);
+      } catch (error) {
+        console.error('Error fetching workspaces:', error);
+        setWorkspaces([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Fetch navigation data (you can replace this with your own API)
+    const fetchNavigationData = async () => {
+      try {
+        // Example API call for navigation data
+        // const res = await fetch('/api/navigation');
+        // const data = await res.json();
+        // setNavData(data.navMain || defaultNavData.navMain);
+        
+        // For now, use default data
+        setNavData(defaultNavData.mainNav);
+      } catch (error) {
+        console.error('Error fetching navigation:', error);
+        setNavData(defaultNavData.mainNav);
+      }
+    };
+
+    fetchWorkspaces();
+    fetchNavigationData();
+  }, []);
+
   return (
-    <SidebarComponent collapsible="icon" className="z-20 border-r bg-gradient-to-b from-background to-muted/5">
-        <SidebarHeader className="flex flex-col items-center justify-center relative px-4 py-5 border-b border-border/50 bg-gradient-to-r from-background to-muted/10">
-            {/* Expanded State */}
-            <div className="group-data-[state=collapsed]:hidden flex flex-col items-center justify-center w-full space-y-3 transition-all duration-300">
-                {/* Logo Section */}
-                <div className="flex items-center justify-center w-full relative">
-                    <Image
-                        src="/logo.png"
-                        alt="default logo"
-                        className="object-contain transition-all duration-300 dark:brightness-0 dark:invert hover:scale-105"
-                        width={140}
-                        height={45}
-                        priority
-                    />
-                </div>
-
-                {/* Site Name */}
-                <div className="text-center space-y-1">
-                    <h1 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                        Prabisha Chatbot Builder
-                    </h1>
-                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                        Powered by{" "}
-                        <Link
-                            href="https://prabisha.com/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary font-medium hover:underline transition-colors flex items-center gap-1"
-                        >
-                            Prabisha
-                            <Sparkles className="h-3 w-3 text-yellow-500" />
-                        </Link>
-                    </p>
-                </div>
-            </div>
-
-            {/* Collapsed State */}
-            <div className="group-data-[state=expanded]:hidden absolute inset-0 flex items-center justify-center">
-                <div>
-                    <Image
-                        src="/logo.png"
-                        alt="default logo"
-                        className="object-contain dark:brightness-0 dark:invert hover:scale-110 transition-transform"
-                        width={36}
-                        height={36}
-                        priority
-                    />
-                </div>
-            </div>
-
-            {/* Sidebar Trigger */}
-            <SidebarTrigger className="h-7 w-7 rounded-full absolute z-50 top-6 -right-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg border transition-all duration-300 hover:scale-110" />
-        </SidebarHeader>
-
-        {/* Navigation Menu */}
-        <SidebarContent className="flex-1 overflow-y-auto">
-          <SidebarGroup className="group/sidebar-group p-0">
-            <SidebarGroupContent>
-              <SidebarMenu className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:items-center gap-0">
-                {MENU_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.url || pathname.startsWith(item.url + '/');
-                  
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
-                        size="lg"
-                        isActive={isActive}
-                        className="border-b border-collapse p-8 relative group/menubutton transition-all duration-200 hover:bg-accent/80 hover:shadow-sm hover:border-accent rounded-none"
-                      >
-                        <Link href={item.url}>
-                          <Icon className={`transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover/menubutton:text-foreground'}`} />
-                          <span className="group-data-[collapsible=icon]:sr-only font-medium">
-                            {item.title}
-                          </span>
-                          
-                          {/* Active indicator */}
-                          {isActive && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
-                          )}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+    <Sidebar variant="inset" collapsible="icon" {...props}>
+      <SidebarHeader>
+        <WorkspaceSwitcher workspaces={workspaces} loading={loading} />
+      </SidebarHeader>
+      { id ? (
+        <SidebarContent>
+          <NavMain items={defaultNavData.chatbotNav} />
         </SidebarContent>
+      ) : (
+        <SidebarContent>
+          <NavMain items={navData} />
+        </SidebarContent>
+      )}
+      <SidebarFooter>
+        <NavUser session={session} />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  )
+}
 
-        <SidebarRail />
-    </SidebarComponent>
-  );
+function NavMain({
+  items,
+}: {
+  items: NavItem[]
+}) {
+  if (!items.length) return null;
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarMenu>
+        {items.map((item) => (
+          <Collapsible
+            key={item.title}
+            asChild
+            defaultOpen={item.isActive}
+            className="group/collapsible"
+          >
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip={item.title}>
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                  {item.items && item.items.length > 0 && (
+                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  )}
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              {item.items && item.items.length > 0 && (
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {item.items.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubButton asChild>
+                          <a href={subItem.url}>
+                            {subItem.icon && <subItem.icon />}
+                            <span>{subItem.title}</span>
+                          </a>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              )}
+            </SidebarMenuItem>
+          </Collapsible>
+        ))}
+      </SidebarMenu>
+    </SidebarGroup>
+  )
+}
+
+export function NavUser({
+  session,
+}: {
+  session: Session | null
+}) {
+  const { isMobile } = useSidebar()
+  const { setTheme, theme } = useTheme();
+
+  const user = {
+    name: session?.user?.name || "Guest",
+    email: session?.user?.email || "guest@example.com",
+    avatar: session?.user?.image || "/avatars/default.jpg",
+  }
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarFallback className="rounded-lg">
+                  {user.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate text-xs">{user.email}</span>
+              </div>
+              <ChevronsUpDown className="ml-auto size-4" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            side={isMobile ? "bottom" : "right"}
+            align="end"
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="p-0 font-normal">
+              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                <Avatar className="h-8 w-8 rounded-lg">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback className="rounded-lg">
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="truncate text-xs">{user.email}</span>
+                </div>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem>
+                <Sparkles />
+                Upgrade to Pro
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                <Sparkles />
+                Appearance
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <BadgeCheck />
+                Account
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <CreditCard />
+                Billing
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Bell />
+                Notifications
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <LogOut />
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
+
+function WorkspaceSwitcher({
+  workspaces,
+  loading,
+}: {
+  workspaces: Workspace[]
+  loading: boolean
+}) {
+  const { isMobile } = useSidebar()
+  const { activeWorkspace, setActiveWorkspace } = useWorkspace();
+
+  useEffect(() => {
+    if (workspaces.length > 0 && !activeWorkspace) {
+      setActiveWorkspace(workspaces[0])
+    }
+  }, [workspaces, activeWorkspace, setActiveWorkspace]);
+
+  const handleWorkspaceAdded = () => {
+    toast.success("Workspace added successfully!");
+    // Optionally, refresh the workspace list here
+  }
+
+  if (loading) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          >
+            <div className="flex items-center gap-2 w-full">
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+              <Skeleton className="h-4 w-4 ml-auto" />
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
+
+  if (!activeWorkspace && workspaces.length === 0) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          >
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-medium">No Workspaces</span>
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <WorkspaceForm onSuccess={handleWorkspaceAdded} />
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground border"
+            >
+              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                <GalleryVerticalEnd className="size-4" />
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">
+                  {activeWorkspace?.name || "Select Workspace"}
+                </span>
+              </div>
+              <ChevronsUpDown className="ml-auto" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            align="start"
+            side={isMobile ? "bottom" : "right"}
+            sideOffset={4}
+          >
+            <DropdownMenuLabel className="text-muted-foreground text-xs">
+              Workspaces
+            </DropdownMenuLabel>
+            {workspaces.map((workspace, index) => (
+              <DropdownMenuItem
+                key={workspace.id || workspace.name}
+                onClick={() => setActiveWorkspace(workspace)}
+                className="gap-2 p-2"
+              >
+                {workspace.name}
+                <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 p-2 cursor-pointer"
+              onSelect={(e) => e.preventDefault()}
+            >
+              <WorkspaceForm
+                onSuccess={handleWorkspaceAdded}
+                trigger={
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                      <Plus className="size-4" />
+                    </div>
+                    <div className="text-muted-foreground font-medium">
+                      Add Workspace
+                    </div>
+                  </div>
+                }
+              />
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
 }

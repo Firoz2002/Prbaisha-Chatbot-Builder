@@ -18,7 +18,7 @@
 /out/
 
 #prisma
-.generated
+**/generated/
 
 # production
 /build

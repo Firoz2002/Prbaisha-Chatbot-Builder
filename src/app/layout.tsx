@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { SessionProvider } from "@/providers/session-provider";
+import { ThemeProvider } from "next-themes";
+import Script from "next/script";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import GoogleOneTap from "@/components/features/GoogleOneTap";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,10 +32,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+       suppressHydrationWarning={true}
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Toaster />
-        {children}
+        <Suspense fallback={<Skeleton className="h-screen w-full" />}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <SessionProvider>
+              <GoogleOneTap />
+              <Toaster richColors position="top-right" closeButton />
+              {children}
+            </SessionProvider>
+          </ThemeProvider>
+        </Suspense>
       </body>
     </html>
   );

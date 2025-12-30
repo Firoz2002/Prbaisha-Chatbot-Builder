@@ -1,46 +1,188 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Bookmark, RotateCcw, Plus, MoreVertical } from "lucide-react";
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Search, Bookmark, RotateCcw, Plus, MoreVertical } from "lucide-react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { formatDistanceToNow } from "date-fns"
+import Link from "next/link"
+import { useWorkspace } from "@/providers/workspace-provider"
+
+// Form validation schema
+const formSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Chatbot name is required")
+    .max(50, "Name must be less than 50 characters")
+    .trim(),
+})
+
+type FormValues = z.infer<typeof formSchema>
 
 interface Chatbot {
   id: string
   name: string
-  icon: string
-  conversations: number
+  image_url?: string | null
+  greeting: string
+  description?: string | null
+  instructions?: string | null
   model: string
-  location: string
-  lastModified: string
-  owner: string
-  ownerInitials: string
+  temperature: number
+  max_tokens: number
+  createdAt: string
+  updatedAt: string
+  _count?: {
+    messages: number
+    flows: number
+    knowledgeBases: number
+  }
 }
 
-const mockChatbots: Chatbot[] = [
-  {
-    id: "1",
-    name: "Test",
-    icon: "🔥",
-    conversations: 0,
-    model: "gpt-4.1-mini",
-    location: "-",
-    lastModified: "17 hours ago",
-    owner: "FK",
-    ownerInitials: "FK",
-  },
-]
-
 export default function ChatbotsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [filter, setFilter] = useState("all")
   const [itemsPerPage, setItemsPerPage] = useState("25")
+  const [chatbots, setChatbots] = useState<Chatbot[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
 
-  const filteredChatbots = mockChatbots.filter((chatbot) =>
+  const { activeWorkspace } = useWorkspace();
+
+  // Initialize form with React Hook Form
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+    },
+    mode: "onChange",
+  })
+
+  const {
+    handleSubmit,
+    formState: { isSubmitting, isValid },
+    reset,
+  } = form
+
+  useEffect(() => {
+    fetchChatbots()
+  }, [activeWorkspace?.id])
+
+  const fetchChatbots = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await fetch(`/api/chatbots?workspaceId=${activeWorkspace?.id}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch chatbots')
+      }
+      
+      const data = await response.json()
+      setChatbots(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('Error fetching chatbots:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this chatbot?')) return
+    
+    try {
+      const response = await fetch(`/api/chatbots/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete chatbot')
+      }
+
+      setChatbots(chatbots.filter(chatbot => chatbot.id !== id))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete chatbot')
+      console.error('Error deleting chatbot:', err)
+    }
+  }
+
+  const handleDuplicate = async (chatbot: Chatbot) => {
+    try {
+      const response = await fetch('/api/chatbots', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${chatbot.name} (Copy)`,
+          workspaceId: activeWorkspace?.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to duplicate chatbot')
+      }
+
+      const data = await response.json()
+      fetchChatbots()
+      return data
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to duplicate chatbot')
+      console.error('Error duplicating chatbot:', err)
+    }
+  }
+
+  const handleEdit = (id: string) => {
+    router.push(`/chatbots/${id}/edit`)
+  }
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      const response = await fetch('/api/chatbots', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: data.name,
+          workspaceId: activeWorkspace?.id,
+        }),
+      })
+
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to create chatbot')
+      }
+
+      // Close dialog, reset form, and refresh list
+      setIsCreateDialogOpen(false)
+      reset()
+      fetchChatbots()
+
+      // Redirect to the newly created chatbot's edit page
+      router.push(`/chatbots/${responseData.chatbot.id}/instructions`)
+
+    } catch (error) {
+      console.error('Error creating chatbot:', error)
+      alert(error instanceof Error ? error.message : 'Failed to create chatbot')
+    }
+  }
+
+  const filteredChatbots = chatbots.filter((chatbot) =>
     chatbot.name.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
@@ -48,15 +190,156 @@ export default function ChatbotsPage() {
   const startItem = 1
   const endItem = Math.min(Number.parseInt(itemsPerPage), totalItems)
 
+  const getChatbotIcon = (chatbot: Chatbot) => {
+    if (chatbot.image_url) return "🖼️"
+    
+    if (chatbot.model.includes('gpt-4')) return "🤖"
+    if (chatbot.model.includes('claude')) return "👨‍💼"
+    if (chatbot.model.includes('gemini')) return "💎"
+    return "💬"
+  }
+
+  const getModelDisplayName = (model: string) => {
+    const modelMap: Record<string, string> = {
+      'gpt-4': 'GPT-4',
+      'gpt-4-turbo': 'GPT-4 Turbo',
+      'gpt-4-mini': 'GPT-4 Mini',
+      'gpt-3.5-turbo': 'GPT-3.5 Turbo',
+      'claude-3': 'Claude 3',
+      'claude-2': 'Claude 2',
+      'gemini-pro': 'Gemini Pro',
+      'llama-2': 'Llama 2',
+    }
+    
+    return modelMap[model] || model
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        
+        <div className="flex gap-3">
+          <Skeleton className="h-10 flex-1" />
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-10 w-10" />
+        </div>
+        
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <TableHead key={i}>
+                    <Skeleton className="h-6 w-24" />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="rounded-full bg-destructive/10 p-3">
+          <div className="text-2xl">⚠️</div>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">Failed to load chatbots</h3>
+          <p className="text-muted-foreground">{error}</p>
+        </div>
+        <Button onClick={fetchChatbots} variant="outline">
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Try Again
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Chatbots</h1>
-        <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4" />
-          Create
-        </Button>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Create New Chatbot</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Chatbot Name
+                        <span className="text-destructive ml-1">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., Customer Support Bot"
+                          disabled={isSubmitting}
+                          {...field}
+                        />
+                      </FormControl>
+                      <div className="flex justify-between items-center">
+                        <FormMessage />
+                        <span className={`text-xs ${
+                          field.value.length > 50 ? 'text-destructive' : 'text-muted-foreground'
+                        }`}>
+                          {field.value.length}/50
+                        </span>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !isValid}
+                  >
+                    {isSubmitting ? 'Creating...' : 'Create Chatbot'}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Search and Filters */}
@@ -76,14 +359,20 @@ export default function ChatbotsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All chatbots</SelectItem>
-            <SelectItem value="owned">Owned by me</SelectItem>
-            <SelectItem value="shared">Shared with me</SelectItem>
+            <SelectItem value="recent">Recently modified</SelectItem>
+            <SelectItem value="gpt">GPT models</SelectItem>
+            <SelectItem value="other">Other models</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" title="Bookmark view">
           <Bookmark className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          title="Refresh"
+          onClick={fetchChatbots}
+        >
           <RotateCcw className="h-4 w-4" />
         </Button>
       </div>
@@ -96,76 +385,133 @@ export default function ChatbotsPage() {
               <TableHead>Name</TableHead>
               <TableHead>Conversations</TableHead>
               <TableHead>Model</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>Flows</TableHead>
+              <TableHead>Knowledge Bases</TableHead>
               <TableHead>Last modified</TableHead>
-              <TableHead>Owner</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredChatbots.map((chatbot) => (
-              <TableRow key={chatbot.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{chatbot.icon}</span>
-                    <span className="font-medium">{chatbot.name}</span>
+            {filteredChatbots.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-32 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="rounded-full bg-muted p-3">
+                      <div className="text-2xl">🤖</div>
+                    </div>
+                    <div>
+                      <p className="font-medium">No chatbots found</p>
+                      <p className="text-sm text-muted-foreground">
+                        {searchQuery ? 'Try a different search term' : 'Create your first chatbot'}
+                      </p>
+                    </div>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">💬</span>
-                    <span>{chatbot.conversations}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">{chatbot.model}</TableCell>
-                <TableCell className="text-sm">{chatbot.location}</TableCell>
-                <TableCell className="text-sm">{chatbot.lastModified}</TableCell>
-                <TableCell>
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                    <span className="h-5 w-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px]">
-                      {chatbot.ownerInitials[0]}
-                    </span>
-                    {chatbot.owner}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                      <DropdownMenuItem>Share</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filteredChatbots.slice(0, Number.parseInt(itemsPerPage)).map((chatbot) => (
+                <TableRow key={chatbot.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{getChatbotIcon(chatbot)}</span>
+                      <div className="flex flex-col">
+                        <Link href={`/chatbots/${chatbot.id}/instructions`} className="font-medium hover:underline">
+                          {chatbot.name}
+                        </Link>
+                        {chatbot.description && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {chatbot.description}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">💬</span>
+                      <span>{chatbot._count?.messages || 0}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{getModelDisplayName(chatbot.model)}</span>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span>Temp: {chatbot.temperature}</span>
+                        <span>•</span>
+                        <span>Tokens: {chatbot.max_tokens}</span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {chatbot._count?.flows || 0} flow{chatbot._count?.flows !== 1 ? 's' : ''}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      {chatbot._count?.knowledgeBases || 0} KB{chatbot._count?.knowledgeBases !== 1 ? 's' : ''}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-sm">
+                        {formatDistanceToNow(new Date(chatbot.updatedAt), { addSuffix: true })}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Created {formatDistanceToNow(new Date(chatbot.createdAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(chatbot.id)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(chatbot)}>
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>Share</DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={() => handleDelete(chatbot.id)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
-          {startItem}–{endItem} of {totalItems}
-        </span>
-        <Select value={itemsPerPage} onValueChange={setItemsPerPage}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="10">10 per page</SelectItem>
-            <SelectItem value="25">25 per page</SelectItem>
-            <SelectItem value="50">50 per page</SelectItem>
-            <SelectItem value="100">100 per page</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {filteredChatbots.length > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            Showing {startItem}–{endItem} of {totalItems} chatbot{totalItems !== 1 ? 's' : ''}
+          </span>
+          <Select value={itemsPerPage} onValueChange={setItemsPerPage}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="25">25 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+              <SelectItem value="100">100 per page</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }

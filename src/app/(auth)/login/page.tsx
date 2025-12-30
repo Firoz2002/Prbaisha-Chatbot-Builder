@@ -5,16 +5,16 @@ import { toast } from "sonner"
 import Image from "next/image"
 import { signIn } from "next-auth/react"
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { User, Key, Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
+import { User, Key, Eye, EyeOff } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [formData, setFormData] = useState({ email: "", password: "" })
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -49,6 +49,17 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
     try {
+      if (!executeRecaptcha) throw new Error("Recaptcha not ready")
+      const token = await executeRecaptcha("register")
+
+      const verifyRes = await fetch("/api/verify-captcha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+      const verifyData = await verifyRes.json()
+      if (!verifyData.success) throw new Error("Captcha verification failed")
+
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
