@@ -17,6 +17,8 @@ export default async function WidgetPage({ params }: PageProps) {
       { cache: 'no-store' }
     );
 
+    console.log('Response:', response);
+    
     if (!response.ok) {
       notFound();
     }

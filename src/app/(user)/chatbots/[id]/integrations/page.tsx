@@ -157,15 +157,8 @@ function App() {
 export default App;`;
 
       case 'nextjs':
-        return `// app/layout.tsx or pages/_app.tsx
-import Script from 'next/script';
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        {children}
-        
+        return `
+        // app/layout.tsx or pages/_app.tsx
         <Script
           id="chatbot-script"
           strategy="lazyOnload"
@@ -174,26 +167,7 @@ export default function RootLayout({ children }) {
             window.chatbot('init', ${configObject});
           }}
         />
-      </body>
-    </html>
-  );
-}
-
-// Alternative: Create a component
-// components/Chatbot.tsx
-'use client';
-
-import { useEffect } from 'react';
-
-export default function Chatbot() {
-  useEffect(() => {
-    if (window.chatbot) {
-      window.chatbot('init', ${configObject});
-    }
-  }, []);
-
-  return null;
-}`;
+`;
 
       case 'vue':
         return `<!-- Add to your main App.vue or layout -->
