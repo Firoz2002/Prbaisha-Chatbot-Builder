@@ -13,7 +13,12 @@ export async function GET(
     const { id } = await context.params;
 
     const conversations = await prisma.conversation.findMany({
-      where: { chatbotId: id },
+      where: { 
+        chatbotId: id, 
+        messages: {
+          some: {}
+        } 
+      },
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: {
